@@ -11,7 +11,7 @@ struct MainWindowView: View {
         NavigationSplitView {
             RequestListView()
                 .navigationSplitViewColumnWidth(min: 400, ideal: 520)
-                .navigationTitle("Requests")
+                .navigationTitle("Rox Proxy")
         } detail: {
             if let exchange = sessionStore.selectedExchange {
                 DetailView(exchange: exchange)

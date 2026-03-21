@@ -10,7 +10,7 @@ struct RoxProxyApp: App {
                 .environment(appDelegate.settingsStore)
         }
         .windowStyle(.titleBar)
-        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
+        .windowToolbarStyle(.unified(showsTitle: true))
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About Rox Proxy") {

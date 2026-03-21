@@ -50,23 +50,25 @@ final class KeychainInstaller {
         }
     }
 
-    /// Checks whether the CA cert with the given DER data is currently trusted.
-    /// Uses the `security verify-cert` approach: imports to a temp keychain and verifies.
-    /// For simplicity, this checks whether the SHA-256 fingerprint is present in the System keychain.
+    /// Returns true only if the CA cert has explicit trust settings in the admin or
+    /// system domain — i.e. it was installed as a trusted root via
+    /// `security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain`.
+    ///
+    /// `SecItemCopyMatching` only checks existence in any keychain and would incorrectly
+    /// return true for a cert that is present but NOT trusted as a root CA.
     func isCAInstalled(derData: Data) -> Bool {
-        // Use Security framework to check if a cert with this data exists in the keychain
         guard let secCert = SecCertificateCreateWithData(nil, derData as CFData) else {
             return false
         }
-
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassCertificate,
-            kSecValueRef: secCert,
-            kSecMatchLimit: kSecMatchLimitOne,
-        ]
-
-        let status = SecItemCopyMatching(query as CFDictionary, nil)
-        return status == errSecSuccess
+        var settings: CFArray?
+        // .admin matches the `-d` flag used in installCAInSystemKeychain
+        if SecTrustSettingsCopyTrustSettings(secCert, .admin, &settings) == errSecSuccess {
+            return true
+        }
+        if SecTrustSettingsCopyTrustSettings(secCert, .system, &settings) == errSecSuccess {
+            return true
+        }
+        return false
     }
 
     // MARK: - Private
