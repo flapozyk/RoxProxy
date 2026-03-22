@@ -3,97 +3,76 @@ import Security
 
 /// Installs and checks trust of the root CA certificate in the macOS Keychain.
 ///
-/// Uses the `security` CLI tool which automatically triggers the macOS admin
-/// authentication dialog — no manual `AuthorizationCreate` boilerplate needed.
+/// Uses the Security Framework APIs directly (not a subprocess) so that macOS
+/// can show the standard authorization dialog — including Touch ID — from the
+/// app's own window server session.
 final class KeychainInstaller {
 
     enum KeychainError: Error, LocalizedError {
-        case writeTempFileFailed
-        case installFailed(Int32, String)
-        case removeTempFileFailed
+        case invalidCertificateData
+        case addToKeychainFailed(OSStatus, String)
+        case trustSettingsFailed(OSStatus, String)
 
         var errorDescription: String? {
             switch self {
-            case .writeTempFileFailed:
-                return "Cannot write CA certificate to a temporary file."
-            case .installFailed(let code, let output):
-                return "Keychain installation failed (exit \(code)): \(output)"
-            case .removeTempFileFailed:
-                return "Cannot remove the temporary CA certificate file."
+            case .invalidCertificateData:
+                return "Cannot parse certificate data."
+            case .addToKeychainFailed(let code, let msg):
+                return "Failed to add certificate to keychain (\(code)): \(msg)"
+            case .trustSettingsFailed(let code, let msg):
+                return "Failed to set trust settings (\(code)): \(msg)"
             }
         }
     }
 
     // MARK: - Public API
 
-    /// Installs the CA certificate as a trusted root in the System keychain.
-    /// Triggers a macOS admin password prompt via the `security` CLI.
+    /// Adds the CA certificate to the user's login keychain and marks it as a
+    /// trusted root CA in the user trust domain.
+    ///
+    /// - Calling this from the main process (not a subprocess) allows macOS to
+    ///   show the Trust confirmation dialog, which supports Touch ID on Macs
+    ///   that have it enrolled.
+    /// - User-domain trust is sufficient for all HTTPS traffic by the current user.
     func installCAInSystemKeychain(derData: Data) async throws {
-        let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("rox-proxy-ca-\(UUID().uuidString).der")
-
-        guard (try? derData.write(to: tempURL, options: .atomic)) != nil else {
-            throw KeychainError.writeTempFileFailed
+        guard let secCert = SecCertificateCreateWithData(nil, derData as CFData) else {
+            throw KeychainError.invalidCertificateData
         }
-        defer { try? FileManager.default.removeItem(at: tempURL) }
 
-        let (exitCode, output) = try await runSecurity([
-            "add-trusted-cert",
-            "-d",
-            "-r", "trustRoot",
-            "-k", "/Library/Keychains/System.keychain",
-            tempURL.path
-        ])
+        // Step 1 — add to the login keychain (idempotent: duplicate is fine)
+        let addQuery: [CFString: Any] = [
+            kSecClass:    kSecClassCertificate,
+            kSecValueRef: secCert,
+        ]
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        guard addStatus == errSecSuccess || addStatus == errSecDuplicateItem else {
+            let msg = SecCopyErrorMessageString(addStatus, nil) as String? ?? "unknown"
+            throw KeychainError.addToKeychainFailed(addStatus, msg)
+        }
 
-        guard exitCode == 0 else {
-            throw KeychainError.installFailed(exitCode, output)
+        // Step 2 — set user-domain trust as root CA.
+        // macOS automatically shows a confirmation dialog (with Touch ID support)
+        // because this is called from the app process, which has a UI session.
+        //
+        // kSecTrustSettingsResultTrustRoot = 1 (SecTrustSettings.h)
+        let trustEntry: NSDictionary = [kSecTrustSettingsResult: NSNumber(value: UInt32(1))]
+        let settings: NSArray = [trustEntry]
+        let trustStatus = SecTrustSettingsSetTrustSettings(secCert, .user, settings)
+        guard trustStatus == errSecSuccess else {
+            let msg = SecCopyErrorMessageString(trustStatus, nil) as String? ?? "unknown"
+            throw KeychainError.trustSettingsFailed(trustStatus, msg)
         }
     }
 
-    /// Returns true only if the CA cert has explicit trust settings in the admin or
-    /// system domain — i.e. it was installed as a trusted root via
-    /// `security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain`.
-    ///
-    /// `SecItemCopyMatching` only checks existence in any keychain and would incorrectly
-    /// return true for a cert that is present but NOT trusted as a root CA.
+    /// Returns true if the CA cert has explicit trust settings in any domain
+    /// (user, admin, or system).
     func isCAInstalled(derData: Data) -> Bool {
         guard let secCert = SecCertificateCreateWithData(nil, derData as CFData) else {
             return false
         }
         var settings: CFArray?
-        // .admin matches the `-d` flag used in installCAInSystemKeychain
-        if SecTrustSettingsCopyTrustSettings(secCert, .admin, &settings) == errSecSuccess {
-            return true
-        }
-        if SecTrustSettingsCopyTrustSettings(secCert, .system, &settings) == errSecSuccess {
-            return true
-        }
-        return false
-    }
-
-    // MARK: - Private
-
-    private func runSecurity(_ args: [String]) async throws -> (Int32, String) {
-        try await withCheckedThrowingContinuation { continuation in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-            process.arguments = args
-
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError  = pipe
-
-            process.terminationHandler = { proc in
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let output = String(data: data, encoding: .utf8) ?? ""
-                continuation.resume(returning: (proc.terminationStatus, output))
-            }
-
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: error)
-            }
-        }
+        return SecTrustSettingsCopyTrustSettings(secCert, .user,   &settings) == errSecSuccess
+            || SecTrustSettingsCopyTrustSettings(secCert, .admin,  &settings) == errSecSuccess
+            || SecTrustSettingsCopyTrustSettings(secCert, .system, &settings) == errSecSuccess
     }
 }

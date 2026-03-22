@@ -65,7 +65,6 @@ final class SystemProxyManager {
 
     // MARK: - Shell helpers
 
-    @discardableResult
     private static func run(_ tool: String, _ args: [String]) {
         _ = shell("/usr/sbin/\(tool)", args: args)
     }
