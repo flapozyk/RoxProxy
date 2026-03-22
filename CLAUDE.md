@@ -5,64 +5,89 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Build
-swift build
+# Build (Flutter macOS app)
+flutter build macos
 
-# Run
-swift run RoxProxy
+# Run (debug)
+flutter run -d macos
 
-# Test (all)
-swift test
+# Test (Dart)
+flutter test
 
-# Test (single test by name)
-swift test --filter "DomainRuleTests/wildcardMatchWorks"
-
-# Release build
-swift build -c release
+# Build Swift plugin only (for quick compilation check)
+cd packages/rox_proxy_native && swift build
 ```
 
 ## Architecture
 
-RoxProxy is a macOS 14+ SwiftUI desktop app that acts as an HTTP/HTTPS intercepting proxy. It is built as an SPM executable (not an `.app` bundle), so `main.swift` manually sets `NSApplication.activationPolicy(.regular)` before launching the SwiftUI lifecycle.
+RoxProxy is a macOS 14+ desktop app that intercepts HTTP/HTTPS traffic. The **UI is Flutter/Dart**; all native proxy logic lives in a local Flutter plugin (`packages/rox_proxy_native`) written in Swift with SwiftNIO.
 
-### Request flow
+### Project layout
 
-1. **`ProxyServer`** — bootstraps a SwiftNIO `ServerBootstrap` bound to `127.0.0.1:<port>`. Each accepted connection gets an HTTP codec pipeline plus `HTTPProxyHandler`.
+```
+lib/                         # Flutter/Dart app
+  main.dart                  # Entry point: ProviderScope + RoxProxyApp
+  app.dart                   # MaterialApp with Material 3 theme
+  models/                    # Dart models (CapturedExchange, DomainRule, ProxySettings, ProxyState)
+  services/                  # ProxyChannel (MethodChannel/EventChannel), SettingsService (JSON)
+  providers/                 # Riverpod providers (exchange list, settings, proxy state, CA trust)
+  utils/                     # DataFormatting, BodyRenderer
+  ui/
+    main_window.dart         # Root scaffold: toolbar, sidebar, detail pane
+    request_list/            # Virtualized exchange list
+    detail/                  # Detail view: headers tab + lazy body tab
+    settings/                # Settings dialog (General, HTTPS Domains, Certificate)
+    components/              # Shared widgets (MethodBadge, StatusIndicator, etc.)
 
-2. **`HTTPProxyHandler`** (NIO `ChannelInboundHandler`) — the main proxy logic:
-   - Plain HTTP requests: opens a `ClientBootstrap` TCP connection, forwards the request, streams the response back via `OutboundHTTPHandler`.
-   - `CONNECT` requests (HTTPS tunnels): either blindly proxies bytes through `TunnelHandler`, or performs MITM TLS interception if the target host matches a `DomainRule`.
+packages/rox_proxy_native/   # Local Flutter plugin (Swift)
+  macos/rox_proxy_native/
+    Sources/rox_proxy_native/
+      Bridge/                # NEW: RoxProxyNativePlugin, ProxyMethodHandler,
+                             #      ExchangeStreamHandler, BridgeSessionStore,
+                             #      BodyStore, ExchangeSerializer
+      Proxy/                 # SwiftNIO handlers (HTTPProxyHandler, MITMHandler, etc.)
+      Certificate/           # CertificateAuthority, DomainCertificateCache, KeychainInstaller
+      SystemProxy/           # SystemProxyManager, CrashGuard
+      Models/                # CapturedExchange, DomainRule, ProxySettings (Swift side)
+      Utilities/             # GzipDecompressor
+```
 
-3. **MITM path** — when MITM is active for a host:
-   - `CertificateAuthority` issues a forged leaf cert (signed by the local root CA, cached in `DomainCertificateCache`).
-   - A `NIOSSLServerHandler` is inserted into the client-facing pipeline.
-   - `MITMSetupHandler` waits for TLS handshake completion, then swaps in an HTTP codec + `MITMHandler`.
-   - `MITMHandler` makes a fresh upstream TLS connection (certificate verification disabled — dev tool) and captures the exchange.
+### Platform channels
 
-4. **`OutboundHTTPHandler`** — handles the upstream client channel; collects and streams the response body back to the client and updates the `CapturedExchange` in `ProxySessionStore`.
+- **MethodChannel** `com.roxproxy/control` — Flutter → Swift: `startProxy`, `stopProxy`, `getProxyState`, `installCACertificate`, `checkCATrust`, `getCAStatus`, `fetchBody`, `releaseBody`, `releaseAllBodies`, `decompressBody`
+- **EventChannel** `com.roxproxy/exchanges` — Swift → Flutter: streams `{type: "new"|"update", exchange: {...}}` maps
 
-### State management
+### Request flow (Swift side)
 
-- **`ProxySessionStore`** (`@MainActor @Observable`) — single source of truth for all captured exchanges, filter text, recording state, and proxy run state. NIO handlers dispatch updates to it via `Task { @MainActor in store.update(exchange) }`.
-- **`SettingsStore`** (`@MainActor @Observable`) — persists `ProxySettings` (port, domain rules, timeouts, etc.) to `UserDefaults`.
+1. **`ProxyServer`** — SwiftNIO `ServerBootstrap` on `127.0.0.1:<port>`. Each connection gets an HTTP codec + `HTTPProxyHandler`.
+2. **`HTTPProxyHandler`** — plain HTTP: forwards via `OutboundHTTPHandler`; `CONNECT`: tunnels blindly (`TunnelHandler`) or MITM-intercepts if host matches a `DomainRule`.
+3. **MITM path** — `CertificateAuthority` issues a forged leaf cert → `NIOSSLServerHandler` → `MITMSetupHandler` → `MITMHandler` makes upstream TLS connection and captures the exchange.
+4. **`BridgeSessionStore`** (replaces the old `ProxySessionStore`) — receives NIO thread callbacks via `Task { @MainActor in ... }` and pushes serialized events to the Flutter EventChannel via `ExchangeStreamHandler`.
+
+### Body transfer pattern
+
+Bodies are NOT inlined in events. Swift stores `Data` in `BodyStore` keyed by UUID; the event carries a `requestBodyRef`/`responseBodyRef` string. Dart calls `fetchBody(ref)` lazily when the user opens an exchange. `FlutterStandardTypedData` transfers `Uint8List` as raw bytes.
+
+### Dart state management (Riverpod)
+
+| Provider | Type | Purpose |
+|---|---|---|
+| `proxyChannelProvider` | `Provider` | Singleton `ProxyChannel` |
+| `settingsProvider` | `StateNotifierProvider` | `ProxySettings`, persisted to JSON |
+| `proxyStateProvider` | `StateNotifierProvider` | `ProxyState` sealed class |
+| `exchangeListProvider` | `StateNotifierProvider` | Live list, fed by EventChannel stream |
+| `filteredExchangesProvider` | `Provider` (derived) | Filtered by `filterTextProvider` |
+| `selectedExchangeProvider` | `Provider` (derived) | Currently selected exchange |
+| `caTrustProvider` | `StateNotifierProvider` | CA initialized/trusted state |
 
 ### Certificate infrastructure
 
-`CertificateAuthority` generates a self-signed P-256 root CA on first launch and stores it in `~/Library/Application Support/RoxProxy/`. It signs per-domain leaf certificates on demand; `DomainCertificateCache` caches them (thread-safe, lock-based). `KeychainInstaller` installs the root CA into the macOS System Keychain so browsers trust it.
+`CertificateAuthority` generates a self-signed P-256 root CA on first launch, stored in `~/Library/Application Support/RoxProxy/`. Per-domain leaf certs are signed on demand and cached by `DomainCertificateCache`. `KeychainInstaller` installs the root CA into the macOS System Keychain.
 
-### Layers
+### macOS entitlements
 
-| Layer | Directory | Responsibility |
-|---|---|---|
-| App | `App/` | `AppDelegate`, `RoxProxyApp` SwiftUI entry point |
-| Proxy (NIO) | `Proxy/` | `HTTPProxyHandler`, `MITMHandler`, `OutboundHTTPHandler`, `TunnelHandler`, `RequestCapture` |
-| Certificate | `Certificate/` | `CertificateAuthority`, `DomainCertificateCache`, `KeychainInstaller` |
-| System | `SystemProxy/` | `SystemProxyManager` (sets macOS system proxy), `CrashGuard` |
-| ViewModels | `ViewModels/` | `ProxySessionStore`, `SettingsStore` |
-| Views | `Views/` | SwiftUI views |
-| Models | `Models/` | `CapturedExchange`, `DomainRule`, `ProxySettings` |
-| Utilities | `Utilities/` | `BodyRenderer`, `GzipDecompressor`, `DataFormatting` |
+App Sandbox is **disabled** (required for TCP binding, `networksetup` subprocess, Keychain trust). Network client + server entitlements are enabled.
 
-### Testing
+### Crash recovery
 
-Tests use Swift Testing (`@Test`, `#expect`), not XCTest. The test target imports `RoxProxy` with `@testable`.
+Swift registers `NSApplication.willTerminateNotification` in `RoxProxyNativePlugin` to stop the proxy and disable the system proxy on clean exit. `CrashGuard` (signal handler + sentinel file) handles unclean exits on relaunch.

@@ -1,4 +1,7 @@
+# macOS
 .DS_Store
+
+# Swift / SPM
 /.build
 /Packages
 xcuserdata/
@@ -6,3 +9,24 @@ DerivedData/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.iml
+
+# Dart
+pubspec.lock
+
+# Xcode (Flutter macOS runner)
+macos/Flutter/GeneratedPluginRegistrant.swift
+macos/Flutter/ephemeral/
+macos/Pods/
+macos/Podfile.lock
+
+# IDE
+.idea/
+*.xcworkspace
