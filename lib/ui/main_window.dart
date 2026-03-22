@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/proxy_settings.dart';
 import '../models/proxy_state.dart';
 import '../providers/exchange_provider.dart';
 import '../providers/proxy_control_provider.dart';
@@ -19,14 +20,16 @@ class MainWindow extends ConsumerStatefulWidget {
 }
 
 class _MainWindowState extends ConsumerState<MainWindow> {
-  // Listen once to trigger auto-start
   bool _autoStartDone = false;
+  List<String>? _lastDomainRuleIds;
 
   @override
   void initState() {
     super.initState();
-    // Defer auto-start until after first build
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAutoStart());
+    // Handle the rare case where settings load completes before the first build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (ref.read(settingsLoadedProvider)) _maybeAutoStart();
+    });
   }
 
   void _maybeAutoStart() {
@@ -36,6 +39,28 @@ class _MainWindowState extends ConsumerState<MainWindow> {
     if (settings.autoStartProxy) {
       ref.read(proxyStateProvider.notifier).start(settings);
     }
+  }
+
+  /// Restarts the proxy whenever domain rules change while it's running,
+  /// so MITM rules take effect immediately without a manual stop/start.
+  void _maybeRestartForRuleChange(ProxySettings settings) {
+    // Ignore calls before settings are loaded from disk — the default empty
+    // rules would look like a "change" compared to the real saved rules.
+    if (!ref.read(settingsLoadedProvider)) return;
+
+    final currentIds =
+        settings.domainRules.map((r) => '${r.id}:${r.isEnabled}').toList()
+          ..sort();
+
+    final proxyState = ref.read(proxyStateProvider);
+    if (proxyState.isRunning &&
+        _lastDomainRuleIds != null &&
+        _lastDomainRuleIds != currentIds) {
+      final notifier = ref.read(proxyStateProvider.notifier);
+      notifier.stop().then((_) => notifier.start(settings));
+    }
+
+    _lastDomainRuleIds = currentIds;
   }
 
   void _openSettings() {
@@ -49,11 +74,21 @@ class _MainWindowState extends ConsumerState<MainWindow> {
 
   @override
   Widget build(BuildContext context) {
+    // Auto-start once settings are loaded from disk (ref.listen is valid here).
+    ref.listen(settingsLoadedProvider, (_, isLoaded) {
+      if (isLoaded) _maybeAutoStart();
+    });
+
     final proxyState = ref.watch(proxyStateProvider);
     final filterText = ref.watch(filterTextProvider);
     final exchanges = ref.watch(exchangeListProvider);
     final selectedExchange = ref.watch(selectedExchangeProvider);
-    final isRecording = ref.watch(settingsProvider).isRecording;
+    final settings = ref.watch(settingsProvider);
+    final isRecording = settings.isRecording;
+
+    // Restart proxy if domain rules changed while running
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _maybeRestartForRuleChange(settings));
 
     return Scaffold(
       appBar: _buildToolbar(context, proxyState, isRecording, exchanges.isEmpty),

@@ -8,20 +8,25 @@ final settingsServiceProvider = Provider<SettingsService>((ref) {
   return SettingsService();
 });
 
+/// True once settings have been loaded from disk for the first time.
+final settingsLoadedProvider = StateProvider<bool>((ref) => false);
+
 final settingsProvider =
     StateNotifierProvider<SettingsNotifier, ProxySettings>((ref) {
-  return SettingsNotifier(ref.read(settingsServiceProvider));
+  return SettingsNotifier(ref.read(settingsServiceProvider), ref);
 });
 
 class SettingsNotifier extends StateNotifier<ProxySettings> {
   final SettingsService _service;
+  final Ref _ref;
 
-  SettingsNotifier(this._service) : super(ProxySettings()) {
+  SettingsNotifier(this._service, this._ref) : super(ProxySettings()) {
     _load();
   }
 
   Future<void> _load() async {
     state = await _service.load();
+    _ref.read(settingsLoadedProvider.notifier).state = true;
   }
 
   Future<void> _save() => _service.save(state);

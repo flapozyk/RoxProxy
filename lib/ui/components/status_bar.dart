@@ -63,11 +63,14 @@ class _StateIndicator extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        Text(
-          state.description,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+        Flexible(
+          child: Text(
+            state.description,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );

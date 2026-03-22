@@ -19,7 +19,7 @@ class CapturedExchange {
   final int port;
   final String path;
   final List<HttpHeader> requestHeaders;
-  final String? requestBodyRef;
+  String? requestBodyRef;
   final int requestSize;
   int? statusCode;
   String? statusMessage;
@@ -109,10 +109,14 @@ class CapturedExchange {
     responseSize = updated.responseSize;
     state = updated.state;
     errorMessage = updated.errorMessage;
-    // Don't overwrite cached bodies — keep existing refs only if null
-    if (_cachedResponseBody == null && updated.responseBodyRef != null) {
-      // ref updated — invalidate old cached body
+    // Update body ref and invalidate cached bytes so BodyTab re-fetches.
+    if (updated.responseBodyRef != null) {
+      responseBodyRef = updated.responseBodyRef;
       _cachedResponseBody = null;
+    }
+    if (updated.requestBodyRef != null) {
+      requestBodyRef = updated.requestBodyRef;
+      _cachedRequestBody = null;
     }
   }
 
