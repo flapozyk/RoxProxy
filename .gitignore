@@ -3,7 +3,7 @@
 
 # Swift / SPM
 /.build
-/Packages
+packages/rox_proxy_native/.build/
 xcuserdata/
 DerivedData/
 .swiftpm/configuration/registries.json
