@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/captured_exchange.dart';
 import '../../providers/exchange_provider.dart';
 import '../../providers/proxy_channel_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../utils/data_formatting.dart';
 import '../components/https_indicator.dart';
 import '../components/method_badge.dart';
@@ -233,6 +234,8 @@ class _ExchangeRow extends ConsumerWidget {
 
   bool get _canCopyCurl => !exchange.isHTTPS || exchange.isMITMDecrypted;
 
+  bool get _canAddDomain => exchange.isHTTPS && !exchange.isMITMDecrypted;
+
   Future<void> _copyAsCurl(BuildContext context, WidgetRef ref) async {
     var bodyBytes = exchange.cachedRequestBody;
     if (bodyBytes == null && exchange.requestBodyRef != null) {
@@ -256,7 +259,12 @@ class _ExchangeRow extends ConsumerWidget {
 
   void _showContextMenu(
       BuildContext context, WidgetRef ref, Offset globalPosition) async {
-    if (!_canCopyCurl) return;
+    if (!_canCopyCurl && !_canAddDomain) return;
+
+    final settings = ref.read(settingsProvider);
+    final alreadyIntercepted =
+        settings.domainRules.any((r) => r.domain == exchange.host);
+
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox;
     final result = await showMenu<String>(
@@ -266,14 +274,42 @@ class _ExchangeRow extends ConsumerWidget {
         Offset.zero & overlay.size,
       ),
       items: [
-        const PopupMenuItem<String>(
-          value: 'curl',
-          child: Text('Copy as cURL', style: TextStyle(fontSize: 13)),
-        ),
+        if (_canCopyCurl)
+          const PopupMenuItem<String>(
+            value: 'curl',
+            child: Text('Copy as cURL', style: TextStyle(fontSize: 13)),
+          ),
+        if (_canAddDomain && !alreadyIntercepted)
+          PopupMenuItem<String>(
+            value: 'add_domain',
+            child: Text(
+              'Intercept HTTPS for ${exchange.host}',
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+        if (_canAddDomain && alreadyIntercepted)
+          PopupMenuItem<String>(
+            enabled: false,
+            value: 'add_domain_disabled',
+            child: Text(
+              '${exchange.host} already intercepted',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+            ),
+          ),
       ],
     );
-    if (result == 'curl' && context.mounted) {
+
+    if (!context.mounted) return;
+    if (result == 'curl') {
       await _copyAsCurl(context, ref);
+    } else if (result == 'add_domain') {
+      ref.read(settingsProvider.notifier).addDomain(exchange.host);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('HTTPS interception enabled for ${exchange.host}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -281,7 +317,7 @@ class _ExchangeRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
       onTap: onTap,
-      onSecondaryTapDown: _canCopyCurl
+      onSecondaryTapDown: (_canCopyCurl || _canAddDomain)
           ? (d) => _showContextMenu(context, ref, d.globalPosition)
           : null,
       child: Container(
