@@ -42,17 +42,29 @@ class ProxyChannel {
     required int port,
     required List<DomainRule> domainRules,
     required int connectionTimeoutSeconds,
+    required bool setSystemProxy,
   }) async {
     final result = await _method.invokeMethod<Map>('startProxy', {
       'port': port,
       'domainRules': domainRules.map((r) => r.toMap()).toList(),
       'connectionTimeoutSeconds': connectionTimeoutSeconds,
+      'setSystemProxy': setSystemProxy,
     });
     return (result?['port'] as int?) ?? port;
   }
 
   Future<void> stopProxy() async {
     await _method.invokeMethod('stopProxy');
+  }
+
+  Future<void> configureSystemProxy({
+    required bool enabled,
+    required int port,
+  }) async {
+    await _method.invokeMethod('configureSystemProxy', {
+      'enabled': enabled,
+      'port': port,
+    });
   }
 
   Future<String> getProxyState() async {

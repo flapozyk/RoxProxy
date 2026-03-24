@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/domain_rule.dart';
 import '../models/proxy_settings.dart';
 import '../services/settings_service.dart';
+import 'proxy_channel_provider.dart';
+import 'proxy_control_provider.dart';
 
 final settingsServiceProvider = Provider<SettingsService>((ref) {
   return SettingsService();
@@ -54,6 +56,18 @@ class SettingsNotifier extends StateNotifier<ProxySettings> {
   void setConnectionTimeout(int seconds) {
     state = state.copyWith(connectionTimeoutSeconds: seconds);
     _save();
+  }
+
+  void setSetSystemProxy(bool value) {
+    state = state.copyWith(setSystemProxy: value);
+    _save();
+    // Apply immediately if the proxy is currently running.
+    if (_ref.read(proxyStateProvider).isRunning) {
+      _ref.read(proxyChannelProvider).configureSystemProxy(
+            enabled: value,
+            port: state.port,
+          );
+    }
   }
 
   void addDomain(String domain) {

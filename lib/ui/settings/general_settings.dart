@@ -71,6 +71,13 @@ class _GeneralSettingsState extends ConsumerState<GeneralSettings> {
           ),
         ),
         _FormRow(
+          label: 'Configure macOS system proxy',
+          child: Switch(
+            value: settings.setSystemProxy,
+            onChanged: notifier.setSetSystemProxy,
+          ),
+        ),
+        _FormRow(
           label: 'Connection timeout (seconds)',
           child: SizedBox(
             width: 100,

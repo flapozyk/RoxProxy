@@ -23,6 +23,7 @@ class ProxyStateNotifier extends StateNotifier<ProxyState> {
         port: settings.port,
         domainRules: settings.domainRules,
         connectionTimeoutSeconds: settings.connectionTimeoutSeconds,
+        setSystemProxy: settings.setSystemProxy,
       );
       state = ProxyRunning(port);
     } catch (e) {

@@ -7,6 +7,7 @@ class ProxySettings {
   int maxExchanges;
   bool autoStartProxy;
   int connectionTimeoutSeconds;
+  bool setSystemProxy;
 
   ProxySettings({
     this.port = 8080,
@@ -15,6 +16,7 @@ class ProxySettings {
     this.maxExchanges = 10000,
     this.autoStartProxy = true,
     this.connectionTimeoutSeconds = 30,
+    this.setSystemProxy = true,
   }) : domainRules = domainRules ?? [];
 
   Map<String, dynamic> toJson() => {
@@ -24,6 +26,7 @@ class ProxySettings {
         'maxExchanges': maxExchanges,
         'autoStartProxy': autoStartProxy,
         'connectionTimeoutSeconds': connectionTimeoutSeconds,
+        'setSystemProxy': setSystemProxy,
       };
 
   factory ProxySettings.fromJson(Map<String, dynamic> json) => ProxySettings(
@@ -36,6 +39,7 @@ class ProxySettings {
         maxExchanges: json['maxExchanges'] as int? ?? 10000,
         autoStartProxy: json['autoStartProxy'] as bool? ?? true,
         connectionTimeoutSeconds: json['connectionTimeoutSeconds'] as int? ?? 30,
+        setSystemProxy: json['setSystemProxy'] as bool? ?? true,
       );
 
   ProxySettings copyWith({
@@ -45,6 +49,7 @@ class ProxySettings {
     int? maxExchanges,
     bool? autoStartProxy,
     int? connectionTimeoutSeconds,
+    bool? setSystemProxy,
   }) =>
       ProxySettings(
         port: port ?? this.port,
@@ -54,5 +59,6 @@ class ProxySettings {
         autoStartProxy: autoStartProxy ?? this.autoStartProxy,
         connectionTimeoutSeconds:
             connectionTimeoutSeconds ?? this.connectionTimeoutSeconds,
+        setSystemProxy: setSystemProxy ?? this.setSystemProxy,
       );
 }

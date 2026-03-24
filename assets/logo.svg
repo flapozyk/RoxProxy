@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Background gradient: deep navy -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#1a2540"/>
+      <stop offset="100%" stop-color="#080d1a"/>
+    </linearGradient>
+
+    <!-- Glow behind the interceptor line -->
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#22d3ee" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Dot inner highlight -->
+    <radialGradient id="dotGlow" cx="35%" cy="30%" r="60%" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#e0f2fe"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ── Background ── -->
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+
+  <!-- Subtle vertical glow column -->
+  <ellipse cx="512" cy="512" rx="90" ry="260" fill="url(#glow)"/>
+
+  <!-- ── Request arrow (→) centred at y = 408 ── -->
+  <!--  body: 192 → 716  |  head: 716 → 844, ±55 from centre -->
+  <path d="M 192 383
+           L 716 383
+           L 716 353
+           L 844 408
+           L 716 463
+           L 716 433
+           L 192 433
+           Z"
+        fill="#e2e8f0" opacity="0.88"/>
+
+  <!-- ── Response arrow (←) centred at y = 616 ── -->
+  <!--  body: 832 → 308  |  head: 308 → 180, ±55 from centre -->
+  <path d="M 832 591
+           L 308 591
+           L 308 561
+           L 180 616
+           L 308 671
+           L 308 641
+           L 832 641
+           Z"
+        fill="#e2e8f0" opacity="0.88"/>
+
+  <!-- ── Interceptor vertical bar ── -->
+  <rect x="494" y="268" width="36" height="488" rx="18" fill="#0ea5e9"/>
+
+  <!-- End caps on the bar -->
+  <circle cx="512" cy="268" r="18" fill="#0ea5e9" opacity="0.55"/>
+  <circle cx="512" cy="756" r="18" fill="#0ea5e9" opacity="0.55"/>
+
+  <!-- ── Intersection node — request (y = 408) ── -->
+  <!-- outer ring -->
+  <circle cx="512" cy="408" r="54" fill="#0369a1" opacity="0.6"/>
+  <!-- main dot -->
+  <circle cx="512" cy="408" r="42" fill="url(#dotGlow)"/>
+  <!-- inner bright core -->
+  <circle cx="512" cy="408" r="16" fill="#ffffff" opacity="0.9"/>
+
+  <!-- ── Intersection node — response (y = 616) ── -->
+  <circle cx="512" cy="616" r="54" fill="#0369a1" opacity="0.6"/>
+  <circle cx="512" cy="616" r="42" fill="url(#dotGlow)"/>
+  <circle cx="512" cy="616" r="16" fill="#ffffff" opacity="0.9"/>
+
+  <!-- ── Subtle inner border for depth ── -->
+  <rect width="1024" height="1024" rx="220"
+        fill="none"
+        stroke="rgba(255,255,255,0.045)"
+        stroke-width="3"/>
+</svg>
