@@ -23,6 +23,7 @@ class MainWindow extends ConsumerStatefulWidget {
 class _MainWindowState extends ConsumerState<MainWindow> {
   bool _autoStartDone = false;
   List<String>? _lastDomainRuleIds;
+  double _listWidth = 520;
 
   @override
   void initState() {
@@ -102,7 +103,7 @@ class _MainWindowState extends ConsumerState<MainWindow> {
               children: [
                 // Sidebar: request list
                 SizedBox(
-                  width: 520,
+                  width: _listWidth,
                   child: Column(
                     children: [
                       _SearchBar(
@@ -115,7 +116,11 @@ class _MainWindowState extends ConsumerState<MainWindow> {
                     ],
                   ),
                 ),
-                const VerticalDivider(width: 1),
+                _PanelDivider(
+                  onDelta: (dx) => setState(() {
+                    _listWidth = (_listWidth + dx).clamp(200.0, 900.0);
+                  }),
+                ),
                 // Detail pane
                 Expanded(
                   child: selectedExchange != null
@@ -283,6 +288,45 @@ class _ToolbarButton extends StatelessWidget {
         splashRadius: 18,
         padding: const EdgeInsets.all(6),
         constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      ),
+    );
+  }
+}
+
+// MARK: - Resizable panel divider
+
+class _PanelDivider extends StatefulWidget {
+  final ValueChanged<double> onDelta;
+  const _PanelDivider({required this.onDelta});
+
+  @override
+  State<_PanelDivider> createState() => _PanelDividerState();
+}
+
+class _PanelDividerState extends State<_PanelDivider> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeColumn,
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragUpdate: (d) => widget.onDelta(d.delta.dx),
+        child: SizedBox(
+          width: 6,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              width: _hovering ? 2 : 1,
+              color: _hovering
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)
+                  : Theme.of(context).dividerColor,
+            ),
+          ),
+        ),
       ),
     );
   }
