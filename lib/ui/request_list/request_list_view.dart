@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/captured_exchange.dart';
 import '../../providers/exchange_provider.dart';
+import '../../providers/proxy_channel_provider.dart';
 import '../../utils/data_formatting.dart';
 import '../components/https_indicator.dart';
 import '../components/method_badge.dart';
@@ -94,7 +96,7 @@ class _HeaderLabel extends StatelessWidget {
   }
 }
 
-class _ExchangeRow extends StatelessWidget {
+class _ExchangeRow extends ConsumerWidget {
   final CapturedExchange exchange;
   final bool isSelected;
   final VoidCallback onTap;
@@ -105,10 +107,58 @@ class _ExchangeRow extends StatelessWidget {
     required this.onTap,
   });
 
+  bool get _canCopyCurl => !exchange.isHTTPS || exchange.isMITMDecrypted;
+
+  Future<void> _copyAsCurl(BuildContext context, WidgetRef ref) async {
+    var bodyBytes = exchange.cachedRequestBody;
+    if (bodyBytes == null && exchange.requestBodyRef != null) {
+      bodyBytes = await ref
+          .read(proxyChannelProvider)
+          .fetchBody(exchange.requestBodyRef!);
+      if (bodyBytes != null) exchange.setCachedRequestBody(bodyBytes);
+    }
+    final curl = DataFormatting.buildCurlCommand(exchange, bodyBytes: bodyBytes);
+    await Clipboard.setData(ClipboardData(text: curl));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('cURL copied to clipboard'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _showContextMenu(
+      BuildContext context, WidgetRef ref, Offset globalPosition) async {
+    if (!_canCopyCurl) return;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+    final result = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        globalPosition & const Size(1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        const PopupMenuItem<String>(
+          value: 'curl',
+          child: Text('Copy as cURL', style: TextStyle(fontSize: 13)),
+        ),
+      ],
+    );
+    if (result == 'curl' && context.mounted) {
+      await _copyAsCurl(context, ref);
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
       onTap: onTap,
+      onSecondaryTapDown: _canCopyCurl
+          ? (d) => _showContextMenu(context, ref, d.globalPosition)
+          : null,
       child: Container(
         height: 28,
         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -145,10 +195,14 @@ class _ExchangeRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                exchange.path,
-                style: const TextStyle(fontSize: 12),
-                overflow: TextOverflow.ellipsis,
+              child: Tooltip(
+                message: exchange.url,
+                waitDuration: const Duration(milliseconds: 500),
+                child: Text(
+                  exchange.path,
+                  style: const TextStyle(fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
             const SizedBox(width: 8),

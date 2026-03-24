@@ -16,7 +16,7 @@ class ProxySettings {
     this.maxExchanges = 10000,
     this.autoStartProxy = true,
     this.connectionTimeoutSeconds = 30,
-    this.setSystemProxy = true,
+    this.setSystemProxy = false,
   }) : domainRules = domainRules ?? [];
 
   Map<String, dynamic> toJson() => {
@@ -39,7 +39,7 @@ class ProxySettings {
         maxExchanges: json['maxExchanges'] as int? ?? 10000,
         autoStartProxy: json['autoStartProxy'] as bool? ?? true,
         connectionTimeoutSeconds: json['connectionTimeoutSeconds'] as int? ?? 30,
-        setSystemProxy: json['setSystemProxy'] as bool? ?? true,
+        setSystemProxy: json['setSystemProxy'] as bool? ?? false,
       );
 
   ProxySettings copyWith({

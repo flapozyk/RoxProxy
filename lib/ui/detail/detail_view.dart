@@ -69,17 +69,20 @@ class _SummaryBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          MethodBadge(exchange.method),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: MethodBadge(exchange.method),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               exchange.url,
               style: const TextStyle(fontSize: 12),
-              overflow: TextOverflow.ellipsis,
+              softWrap: true,
             ),
           ),
           const SizedBox(width: 8),
