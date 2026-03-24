@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -55,7 +56,7 @@ class _MainWindowState extends ConsumerState<MainWindow> {
     final proxyState = ref.read(proxyStateProvider);
     if (proxyState.isRunning &&
         _lastDomainRuleIds != null &&
-        _lastDomainRuleIds != currentIds) {
+        !listEquals(_lastDomainRuleIds, currentIds)) {
       final notifier = ref.read(proxyStateProvider.notifier);
       notifier.stop().then((_) => notifier.start(settings));
     }
