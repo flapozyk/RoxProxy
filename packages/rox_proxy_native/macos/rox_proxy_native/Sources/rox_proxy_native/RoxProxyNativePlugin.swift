@@ -58,7 +58,8 @@ public class RoxProxyNativePlugin: NSObject, FlutterPlugin {
             object: nil,
             queue: .main
         ) { _ in
-            Task { @MainActor in
+            // Must run synchronously: the app may exit before an async Task executes.
+            MainActor.assumeIsolated {
                 Self.methodHandler?.stopProxyOnTerminate()
             }
         }

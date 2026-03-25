@@ -15,6 +15,9 @@ class _GeneralSettingsState extends ConsumerState<GeneralSettings> {
   late final TextEditingController _portController;
   late final TextEditingController _maxExchangesController;
   late final TextEditingController _timeoutController;
+  late final FocusNode _portFocus;
+  late final FocusNode _maxExchangesFocus;
+  late final FocusNode _timeoutFocus;
 
   @override
   void initState() {
@@ -25,6 +28,46 @@ class _GeneralSettingsState extends ConsumerState<GeneralSettings> {
         TextEditingController(text: settings.maxExchanges.toString());
     _timeoutController = TextEditingController(
         text: settings.connectionTimeoutSeconds.toString());
+
+    _portFocus = FocusNode()
+      ..addListener(() {
+        if (!_portFocus.hasFocus) _savePort(_portController.text);
+      });
+    _maxExchangesFocus = FocusNode()
+      ..addListener(() {
+        if (!_maxExchangesFocus.hasFocus) _saveMaxExchanges(_maxExchangesController.text);
+      });
+    _timeoutFocus = FocusNode()
+      ..addListener(() {
+        if (!_timeoutFocus.hasFocus) _saveTimeout(_timeoutController.text);
+      });
+  }
+
+  void _savePort(String v) {
+    final port = int.tryParse(v);
+    if (port != null && port > 0 && port < 65536) {
+      ref.read(settingsProvider.notifier).setPort(port);
+    } else {
+      _portController.text = ref.read(settingsProvider).port.toString();
+    }
+  }
+
+  void _saveMaxExchanges(String v) {
+    final n = int.tryParse(v);
+    if (n != null && n > 0) {
+      ref.read(settingsProvider.notifier).setMaxExchanges(n);
+    } else {
+      _maxExchangesController.text = ref.read(settingsProvider).maxExchanges.toString();
+    }
+  }
+
+  void _saveTimeout(String v) {
+    final t = int.tryParse(v);
+    if (t != null && t > 0) {
+      ref.read(settingsProvider.notifier).setConnectionTimeout(t);
+    } else {
+      _timeoutController.text = ref.read(settingsProvider).connectionTimeoutSeconds.toString();
+    }
   }
 
   @override
@@ -32,13 +75,15 @@ class _GeneralSettingsState extends ConsumerState<GeneralSettings> {
     _portController.dispose();
     _maxExchangesController.dispose();
     _timeoutController.dispose();
+    _portFocus.dispose();
+    _maxExchangesFocus.dispose();
+    _timeoutFocus.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
-    final notifier = ref.read(settingsProvider.notifier);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -50,16 +95,12 @@ class _GeneralSettingsState extends ConsumerState<GeneralSettings> {
             width: 100,
             child: TextField(
               controller: _portController,
+              focusNode: _portFocus,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               style: const TextStyle(fontSize: 13),
               decoration: _inputDecoration(),
-              onSubmitted: (v) {
-                final port = int.tryParse(v);
-                if (port != null && port > 0 && port < 65536) {
-                  notifier.setPort(port);
-                }
-              },
+              onSubmitted: _savePort,
             ),
           ),
         ),
@@ -83,14 +124,12 @@ class _GeneralSettingsState extends ConsumerState<GeneralSettings> {
             width: 100,
             child: TextField(
               controller: _timeoutController,
+              focusNode: _timeoutFocus,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               style: const TextStyle(fontSize: 13),
               decoration: _inputDecoration(),
-              onSubmitted: (v) {
-                final t = int.tryParse(v);
-                if (t != null && t > 0) notifier.setConnectionTimeout(t);
-              },
+              onSubmitted: _saveTimeout,
             ),
           ),
         ),
@@ -102,14 +141,12 @@ class _GeneralSettingsState extends ConsumerState<GeneralSettings> {
             width: 100,
             child: TextField(
               controller: _maxExchangesController,
+              focusNode: _maxExchangesFocus,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               style: const TextStyle(fontSize: 13),
               decoration: _inputDecoration(),
-              onSubmitted: (v) {
-                final n = int.tryParse(v);
-                if (n != null && n > 0) notifier.setMaxExchanges(n);
-              },
+              onSubmitted: _saveMaxExchanges,
             ),
           ),
         ),

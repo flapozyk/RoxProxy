@@ -15,7 +15,7 @@ class CertificateSetupView extends ConsumerWidget {
     final ca = ref.watch(caTrustProvider);
     final notifier = ref.read(caTrustProvider.notifier);
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -235,23 +235,24 @@ class _CopyableChipState extends State<_CopyableChip> {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(6),
-      onTap: () async {
-        await Clipboard.setData(ClipboardData(text: widget.value));
-        setState(() => _copied = true);
-        await Future.delayed(const Duration(seconds: 2));
-        if (mounted) setState(() => _copied = false);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () async {
+          await Clipboard.setData(ClipboardData(text: widget.value));
+          setState(() => _copied = true);
+          await Future.delayed(const Duration(seconds: 2));
+          if (mounted) setState(() => _copied = false);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             Text(
               widget.value,
               style: const TextStyle(
@@ -267,7 +268,8 @@ class _CopyableChipState extends State<_CopyableChip> {
                   ? const Color(0xFF34C759)
                   : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
