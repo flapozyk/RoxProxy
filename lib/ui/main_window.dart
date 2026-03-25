@@ -86,14 +86,14 @@ class _MainWindowState extends ConsumerState<MainWindow> {
     final exchanges = ref.watch(exchangeListProvider);
     final selectedExchange = ref.watch(selectedExchangeProvider);
     final settings = ref.watch(settingsProvider);
-    final isRecording = settings.isRecording;
+    final httpsEnabled = settings.httpsInterceptionEnabled;
 
-    // Restart proxy if domain rules changed while running
+    // Restart proxy if domain rules or HTTPS interception flag changed while running
     WidgetsBinding.instance.addPostFrameCallback(
         (_) => _maybeRestartForRuleChange(settings));
 
     return Scaffold(
-      appBar: _buildToolbar(context, proxyState, isRecording, exchanges.isEmpty),
+      appBar: _buildToolbar(context, proxyState, httpsEnabled, exchanges.isEmpty),
       body: Column(
         children: [
           CaWarningBanner(onOpenSettings: _openSettings),
@@ -139,7 +139,7 @@ class _MainWindowState extends ConsumerState<MainWindow> {
   PreferredSizeWidget _buildToolbar(
     BuildContext context,
     ProxyState proxyState,
-    bool isRecording,
+    bool httpsEnabled,
     bool exchangesEmpty,
   ) {
     return AppBar(
@@ -169,14 +169,20 @@ class _MainWindowState extends ConsumerState<MainWindow> {
           },
         ),
         const SizedBox(width: 4),
-        // Record toggle
+        // HTTPS interception toggle
         _ToolbarButton(
-          icon: isRecording ? Icons.fiber_manual_record : Icons.fiber_manual_record_outlined,
-          label: isRecording ? 'Pause' : 'Record',
-          color: isRecording ? const Color(0xFFFF3B30) : null,
+          icon: httpsEnabled ? Icons.lock_outlined : Icons.lock_open_outlined,
+          label: httpsEnabled ? 'HTTPS interception on' : 'HTTPS interception off',
+          color: httpsEnabled ? const Color(0xFF34C759) : const Color(0xFFFF9500),
           onPressed: () {
             final notifier = ref.read(settingsProvider.notifier);
-            notifier.setIsRecording(!isRecording);
+            notifier.setHttpsInterceptionEnabled(!httpsEnabled);
+            // Restart proxy immediately if running so the change takes effect
+            if (proxyState.isRunning) {
+              final settings = ref.read(settingsProvider);
+              final ctrl = ref.read(proxyStateProvider.notifier);
+              ctrl.stop().then((_) => ctrl.start(settings));
+            }
           },
         ),
         const SizedBox(width: 4),

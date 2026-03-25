@@ -24,6 +24,7 @@ class ProxyStateNotifier extends StateNotifier<ProxyState> {
         domainRules: settings.domainRules,
         connectionTimeoutSeconds: settings.connectionTimeoutSeconds,
         setSystemProxy: settings.setSystemProxy,
+        httpsInterceptionEnabled: settings.httpsInterceptionEnabled,
       );
       state = ProxyRunning(port);
     } catch (e) {

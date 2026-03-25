@@ -8,6 +8,7 @@ class ProxySettings {
   bool autoStartProxy;
   int connectionTimeoutSeconds;
   bool setSystemProxy;
+  bool httpsInterceptionEnabled;
 
   ProxySettings({
     this.port = 8080,
@@ -17,6 +18,7 @@ class ProxySettings {
     this.autoStartProxy = true,
     this.connectionTimeoutSeconds = 30,
     this.setSystemProxy = false,
+    this.httpsInterceptionEnabled = true,
   }) : domainRules = domainRules ?? [];
 
   Map<String, dynamic> toJson() => {
@@ -27,6 +29,7 @@ class ProxySettings {
         'autoStartProxy': autoStartProxy,
         'connectionTimeoutSeconds': connectionTimeoutSeconds,
         'setSystemProxy': setSystemProxy,
+        'httpsInterceptionEnabled': httpsInterceptionEnabled,
       };
 
   factory ProxySettings.fromJson(Map<String, dynamic> json) => ProxySettings(
@@ -40,6 +43,7 @@ class ProxySettings {
         autoStartProxy: json['autoStartProxy'] as bool? ?? true,
         connectionTimeoutSeconds: json['connectionTimeoutSeconds'] as int? ?? 30,
         setSystemProxy: json['setSystemProxy'] as bool? ?? false,
+        httpsInterceptionEnabled: json['httpsInterceptionEnabled'] as bool? ?? true,
       );
 
   ProxySettings copyWith({
@@ -50,6 +54,7 @@ class ProxySettings {
     bool? autoStartProxy,
     int? connectionTimeoutSeconds,
     bool? setSystemProxy,
+    bool? httpsInterceptionEnabled,
   }) =>
       ProxySettings(
         port: port ?? this.port,
@@ -60,5 +65,6 @@ class ProxySettings {
         connectionTimeoutSeconds:
             connectionTimeoutSeconds ?? this.connectionTimeoutSeconds,
         setSystemProxy: setSystemProxy ?? this.setSystemProxy,
+        httpsInterceptionEnabled: httpsInterceptionEnabled ?? this.httpsInterceptionEnabled,
       );
 }

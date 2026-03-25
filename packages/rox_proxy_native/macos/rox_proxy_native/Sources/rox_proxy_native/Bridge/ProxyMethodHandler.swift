@@ -73,6 +73,9 @@ final class ProxyMethodHandler: NSObject {
             return DomainRule(id: id, domain: domain, isEnabled: isEnabled)
         }
 
+        let httpsInterceptionEnabled = args["httpsInterceptionEnabled"] as? Bool ?? true
+        let setSystemProxy = args["setSystemProxy"] as? Bool ?? true
+
         let store = BridgeSessionStore(streamHandler: streamHandler, bodyStore: bodyStore)
         let server = ProxyServer(
             port: port,
@@ -80,11 +83,10 @@ final class ProxyMethodHandler: NSObject {
             domainRules: domainRules,
             connectionTimeoutSeconds: timeout,
             certificateAuthority: certificateAuthority,
-            domainCertCache: domainCertCache
+            domainCertCache: domainCertCache,
+            httpsInterceptionEnabled: httpsInterceptionEnabled
         )
         self.proxyServer = server
-
-        let setSystemProxy = args["setSystemProxy"] as? Bool ?? true
 
         Task {
             do {

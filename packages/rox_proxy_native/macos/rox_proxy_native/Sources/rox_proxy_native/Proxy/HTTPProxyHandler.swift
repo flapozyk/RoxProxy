@@ -33,17 +33,20 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler {
     let certificateAuthority: CertificateAuthority?
     let domainCertCache: DomainCertificateCache?
     let domainRules: [DomainRule]
+    let httpsInterceptionEnabled: Bool
 
     init(
         store: BridgeSessionStore,
         certificateAuthority: CertificateAuthority? = nil,
         domainCertCache: DomainCertificateCache? = nil,
-        domainRules: [DomainRule] = []
+        domainRules: [DomainRule] = [],
+        httpsInterceptionEnabled: Bool = true
     ) {
         self.store = store
         self.certificateAuthority = certificateAuthority
         self.domainCertCache = domainCertCache
         self.domainRules = domainRules
+        self.httpsInterceptionEnabled = httpsInterceptionEnabled
     }
 
     // MARK: - ChannelInboundHandler
@@ -187,7 +190,8 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler {
         let target = Self.parseCONNECTTarget(authority: head.uri)
 
         // Decide: MITM (TLS interception) or blind tunnel
-        let shouldMITM = domainCertCache != nil
+        let shouldMITM = httpsInterceptionEnabled
+            && domainCertCache != nil
             && domainRules.contains(where: { $0.matches(host: target.host) })
 
         if shouldMITM {

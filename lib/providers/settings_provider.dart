@@ -58,6 +58,11 @@ class SettingsNotifier extends StateNotifier<ProxySettings> {
     _save();
   }
 
+  void setHttpsInterceptionEnabled(bool value) {
+    state = state.copyWith(httpsInterceptionEnabled: value);
+    _save();
+  }
+
   void setSetSystemProxy(bool value) {
     state = state.copyWith(setSystemProxy: value);
     _save();

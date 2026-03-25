@@ -43,12 +43,14 @@ class ProxyChannel {
     required List<DomainRule> domainRules,
     required int connectionTimeoutSeconds,
     required bool setSystemProxy,
+    required bool httpsInterceptionEnabled,
   }) async {
     final result = await _method.invokeMethod<Map>('startProxy', {
       'port': port,
       'domainRules': domainRules.map((r) => r.toMap()).toList(),
       'connectionTimeoutSeconds': connectionTimeoutSeconds,
       'setSystemProxy': setSystemProxy,
+      'httpsInterceptionEnabled': httpsInterceptionEnabled,
     });
     return (result?['port'] as int?) ?? port;
   }

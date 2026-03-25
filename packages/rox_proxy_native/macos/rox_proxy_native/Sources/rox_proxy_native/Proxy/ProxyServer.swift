@@ -15,6 +15,7 @@ final class ProxyServer {
     private let connectionTimeoutSeconds: Int
     // Snapshot of domain rules taken at start time (Sendable value type, safe to pass to NIO threads)
     private let domainRules: [DomainRule]
+    private let httpsInterceptionEnabled: Bool
 
     private var channel: Channel?
     private var group: MultiThreadedEventLoopGroup?
@@ -28,7 +29,8 @@ final class ProxyServer {
         domainRules: [DomainRule] = [],
         connectionTimeoutSeconds: Int = 30,
         certificateAuthority: CertificateAuthority? = nil,
-        domainCertCache: DomainCertificateCache? = nil
+        domainCertCache: DomainCertificateCache? = nil,
+        httpsInterceptionEnabled: Bool = true
     ) {
         self.port = port
         self.store = store
@@ -36,6 +38,7 @@ final class ProxyServer {
         self.domainCertCache = domainCertCache
         self.connectionTimeoutSeconds = connectionTimeoutSeconds
         self.domainRules = domainRules
+        self.httpsInterceptionEnabled = httpsInterceptionEnabled
     }
 
     // MARK: - Lifecycle
@@ -51,6 +54,7 @@ final class ProxyServer {
         let certCache     = self.domainCertCache
         let domainRules   = self.domainRules
         let timeoutSecs   = self.connectionTimeoutSeconds
+        let httpsEnabled  = self.httpsInterceptionEnabled
 
         let bootstrap = ServerBootstrap(group: group)
             .serverChannelOption(ChannelOptions.backlog, value: 256)
@@ -70,7 +74,8 @@ final class ProxyServer {
                                 store: store,
                                 certificateAuthority: ca,
                                 domainCertCache: certCache,
-                                domainRules: domainRules
+                                domainRules: domainRules,
+                                httpsInterceptionEnabled: httpsEnabled
                             ),
                             name: "HTTPProxyHandler"
                         )
