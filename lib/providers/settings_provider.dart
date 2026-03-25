@@ -27,7 +27,9 @@ class SettingsNotifier extends StateNotifier<ProxySettings> {
   }
 
   Future<void> _load() async {
-    state = await _service.load();
+    final loaded = await _service.load();
+    // isRecording has no UI toggle anymore; always start in recording mode.
+    state = loaded.copyWith(isRecording: true);
     _ref.read(settingsLoadedProvider.notifier).state = true;
   }
 
