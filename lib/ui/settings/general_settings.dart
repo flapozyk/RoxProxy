@@ -84,6 +84,7 @@ class _GeneralSettingsState extends ConsumerState<GeneralSettings> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
 
     return ListView(
       padding: const EdgeInsets.all(16),
