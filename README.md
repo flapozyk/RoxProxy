@@ -1,6 +1,6 @@
 # Rox Proxy
 
-A macOS 14+ desktop HTTP/HTTPS proxy inspector, similar to Charles Proxy or Proxyman. Built with Flutter (UI) and Swift/SwiftNIO (native proxy engine).
+A macOS 14+ desktop HTTP/HTTPS proxy inspector. Built with Flutter (UI) and Swift/SwiftNIO (native proxy engine).
 
 ## Features
 
@@ -68,7 +68,7 @@ The proxy listens on all network interfaces (`0.0.0.0`), so devices on the same 
 
 1. Find your Mac's local IP (shown in Settings → Certificate).
 2. On the mobile device, set the HTTP/HTTPS proxy to `<mac-ip>:<port>` (default port `8888`).
-3. Open `http://cert.roxproxy/` in the device browser — the proxy serves the CA certificate directly (similar to Charles's `chls.pro/ssl`).
+3. Open `http://cert.roxproxy/` in the device browser — the proxy serves the CA certificate directly.
 4. Install and trust the certificate in the device settings.
 
 > **iOS**: Settings → General → VPN & Device Management → install, then Settings → General → About → Certificate Trust Settings → enable.

@@ -105,7 +105,7 @@ final class HTTPProxyHandler: ChannelInboundHandler, RemovableChannelHandler {
 
         let target = Self.parseTarget(uri: head.uri, headers: head.headers)
 
-        // Intercept CA certificate download (similar to Charles Proxy's chls.pro/ssl).
+        // Intercept CA certificate download.
         // Any device that has this proxy configured can visit http://cert.roxproxy/
         // to download and install the CA certificate.
         if target.host.lowercased() == "cert.roxproxy" {
