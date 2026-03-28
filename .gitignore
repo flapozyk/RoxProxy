@@ -30,3 +30,9 @@ macos/Podfile.lock
 # IDE
 .idea/
 *.xcworkspace
+
+# Claude specific files
+.claude/settings.local.json
+
+# Xcode generated files
+.swiftpm/xcode/xcshareddata/xcschemes/
