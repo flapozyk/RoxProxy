@@ -118,14 +118,18 @@ class _MainWindowState extends ConsumerState<MainWindow> {
                 ),
                 _PanelDivider(
                   onDelta: (dx) => setState(() {
-                    _listWidth = (_listWidth + dx).clamp(200.0, 900.0);
+                    _listWidth = (_listWidth + dx).clamp(300.0, 900.0);
                   }),
                 ),
                 // Detail pane
                 Expanded(
-                  child: selectedExchange != null
-                      ? DetailView(exchange: selectedExchange)
-                      : const _EmptyDetail(),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return selectedExchange != null
+                          ? DetailView(exchange: selectedExchange)
+                          : const _EmptyDetail();
+                    },
+                  ),
                 ),
               ],
             ),

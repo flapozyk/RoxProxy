@@ -61,39 +61,48 @@ class _RequestListViewState extends ConsumerState<RequestListView> {
     final exchanges = ref.watch(filteredExchangesProvider);
     final selectedId = ref.watch(selectedExchangeIdProvider);
 
-    return Column(
-      children: [
-        _ColumnHeader(
-          widths: _widths,
-          onResize: (updated) => setState(() => _widths = updated),
-        ),
-        const Divider(height: 1),
-        Expanded(
-          child: exchanges.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No requests captured',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: exchanges.length,
-                  itemExtent: 28,
-                  itemBuilder: (context, index) {
-                    final exchange = exchanges[index];
-                    final isSelected = exchange.id == selectedId;
-                    return _ExchangeRow(
-                      exchange: exchange,
-                      isSelected: isSelected,
-                      widths: _widths,
-                      onTap: () => ref
-                          .read(selectedExchangeIdProvider.notifier)
-                          .state = exchange.id,
-                    );
-                  },
-                ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final showHeaders = constraints.maxWidth > 400;
+        return Column(
+          children: [
+            if (showHeaders)
+              _ColumnHeader(
+                widths: _widths,
+                onResize: (updated) => setState(() => _widths = updated),
+              ),
+            if (showHeaders) const Divider(height: 1),
+            Expanded(
+              child: exchanges.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No requests captured',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: constraints.maxWidth < 600 ? 12 : 14,
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: exchanges.length,
+                      itemExtent: 28,
+                      itemBuilder: (context, index) {
+                        final exchange = exchanges[index];
+                        final isSelected = exchange.id == selectedId;
+                        return _ExchangeRow(
+                          exchange: exchange,
+                          isSelected: isSelected,
+                          widths: _widths,
+                          onTap: () => ref
+                              .read(selectedExchangeIdProvider.notifier)
+                              .state = exchange.id,
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

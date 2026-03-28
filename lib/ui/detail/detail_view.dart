@@ -35,27 +35,35 @@ class _DetailViewState extends State<DetailView>
   @override
   Widget build(BuildContext context) {
     final e = widget.exchange;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SummaryBar(exchange: e),
-        const Divider(height: 1),
-        TabBar(
-          controller: _tabController,
-          labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-          tabs: const [Tab(text: 'Request'), Tab(text: 'Response')],
-        ),
-        const Divider(height: 1),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _RequestPane(exchange: e),
-              _ResponsePane(exchange: e),
-            ],
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 600;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SummaryBar(exchange: e, isCompact: isCompact),
+            const Divider(height: 1),
+            TabBar(
+              controller: _tabController,
+              labelStyle: TextStyle(
+                fontSize: isCompact ? 11 : 12,
+                fontWeight: FontWeight.w500,
+              ),
+              tabs: const [Tab(text: 'Request'), Tab(text: 'Response')],
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _RequestPane(exchange: e),
+                  _ResponsePane(exchange: e),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -64,7 +72,8 @@ class _DetailViewState extends State<DetailView>
 
 class _SummaryBar extends StatelessWidget {
   final CapturedExchange exchange;
-  const _SummaryBar({required this.exchange});
+  final bool isCompact;
+  const _SummaryBar({required this.exchange, this.isCompact = false});
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +90,7 @@ class _SummaryBar extends StatelessWidget {
           Expanded(
             child: Text(
               exchange.url,
-              style: const TextStyle(fontSize: 12),
+              style: TextStyle(fontSize: isCompact ? 11 : 12),
               softWrap: true,
             ),
           ),
@@ -94,14 +103,14 @@ class _SummaryBar extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               DataFormatting.formatDuration(exchange.duration),
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
+              style: TextStyle(fontSize: isCompact ? 10 : 11, color: Colors.grey),
             ),
           ],
           if (exchange.responseSize != null) ...[
             const SizedBox(width: 8),
             Text(
               DataFormatting.formatSize(exchange.responseSize!),
-              style: const TextStyle(fontSize: 11, color: Colors.grey),
+              style: TextStyle(fontSize: isCompact ? 10 : 11, color: Colors.grey),
             ),
           ],
         ],
