@@ -4,7 +4,12 @@
       "WebSearch",
       "Bash(swift package:*)",
       "Bash(swift build:*)",
-      "Bash(swift test:*)"
+      "Bash(swift test:*)",
+      "Bash(flutter --version)",
+      "Bash(flutter config:*)",
+      "Bash(flutter build:*)",
+      "Bash(flutter pub:*)",
+      "Bash(flutter analyze:*)"
     ]
   }
 }
