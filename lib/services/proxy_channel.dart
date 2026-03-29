@@ -117,4 +117,11 @@ class ProxyChannel {
       'encoding': encoding,
     });
   }
+
+  // MARK: - Replay
+
+  Future<String> replayRequest(Map<String, dynamic> request) async {
+    final result = await _method.invokeMethod<Map>('replayRequest', request);
+    return result?['exchangeId'] as String? ?? '';
+  }
 }

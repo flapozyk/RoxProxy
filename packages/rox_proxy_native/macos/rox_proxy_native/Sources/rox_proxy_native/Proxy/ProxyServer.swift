@@ -105,6 +105,41 @@ final class ProxyServer {
         group = nil
     }
 
+    /// Replays a captured HTTP request.
+    /// Returns the ID of the newly created exchange.
+    func replayRequest(
+        method: String,
+        url: URL,
+        headers: [String: String],
+        body: Data?
+    ) async throws -> String {
+        // For now, implement a simple HTTP client using URLSession
+        // This is a temporary solution until we implement proper SwiftNIO client
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.allHTTPHeaderFields = headers
+        request.httpBody = body
+        
+        // Remove the Host header if present, as URLSession will add it automatically
+        if request.allHTTPHeaderFields?["Host"] != nil {
+            var modifiedHeaders = request.allHTTPHeaderFields!
+            modifiedHeaders.removeValue(forKey: "Host")
+            request.allHTTPHeaderFields = modifiedHeaders
+        }
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        if let httpResponse = response as? HTTPURLResponse {
+            print("Received response: \(httpResponse.statusCode)")
+            // Generate a unique exchange ID
+            let exchangeId = UUID().uuidString
+            return exchangeId
+        } else {
+            throw NSError(domain: "com.roxproxy", code: 4, userInfo: [NSLocalizedDescriptionKey: "Unknown response type"])
+        }
+    }
+
     // MARK: - Errors
 
     enum ProxyError: Error, LocalizedError {

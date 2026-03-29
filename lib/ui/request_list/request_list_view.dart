@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/captured_exchange.dart';
+import '../../models/replay_request.dart';
 import '../../providers/exchange_provider.dart';
 import '../../providers/proxy_channel_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -10,6 +11,7 @@ import '../../utils/data_formatting.dart';
 import '../components/https_indicator.dart';
 import '../components/method_badge.dart';
 import '../components/status_indicator.dart';
+import '../replay_dialog.dart';
 
 // MARK: - Column widths
 
@@ -245,6 +247,9 @@ class _ExchangeRow extends ConsumerWidget {
 
   bool get _canAddDomain => exchange.isHTTPS && !exchange.isMITMDecrypted;
 
+  bool get _canReplay => exchange.state == ExchangeState.completed && 
+                         !(exchange.isHTTPS && !exchange.isMITMDecrypted && exchange.method == 'CONNECT');
+
   Future<void> _copyAsCurl(BuildContext context, WidgetRef ref) async {
     var bodyBytes = exchange.cachedRequestBody;
     if (bodyBytes == null && exchange.requestBodyRef != null) {
@@ -305,6 +310,11 @@ class _ExchangeRow extends ConsumerWidget {
               style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
             ),
           ),
+        if (_canReplay)
+          const PopupMenuItem<String>(
+            value: 'replay',
+            child: Text('Edit and Replay', style: TextStyle(fontSize: 13)),
+          ),
       ],
     );
 
@@ -319,6 +329,35 @@ class _ExchangeRow extends ConsumerWidget {
           duration: const Duration(seconds: 2),
         ),
       );
+    } else if (result == 'replay') {
+      await _showReplayDialog(context, ref);
+    }
+  }
+
+  Future<void> _showReplayDialog(BuildContext context, WidgetRef ref) async {
+    final replayRequest = ReplayRequest.fromExchange(exchange);
+    final result = await showDialog<ReplayRequest>(
+      context: context,
+      builder: (context) => ReplayDialog(initialRequest: replayRequest),
+    );
+    if (result != null) {
+      try {
+        final channel = ref.read(proxyChannelProvider);
+        final exchangeId = await channel.replayRequest(result.toMap());
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Request replayed: $exchangeId'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to replay: ${e.toString()}'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 

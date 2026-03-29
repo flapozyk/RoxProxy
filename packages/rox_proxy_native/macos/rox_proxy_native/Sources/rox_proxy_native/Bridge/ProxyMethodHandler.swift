@@ -47,6 +47,7 @@ final class ProxyMethodHandler: NSObject {
         case "releaseBody":     releaseBody(call, result: result)
         case "releaseAllBodies": releaseAllBodies(result: result)
         case "decompressBody":  decompressBody(call, result: result)
+        case "replayRequest":   replayRequest(call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -256,6 +257,50 @@ final class ProxyMethodHandler: NSObject {
             result(FlutterStandardTypedData(bytes: decompressed))
         } else {
             result(nil)
+        }
+    }
+
+    // MARK: - Replay
+
+    private func replayRequest(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any],
+              let method = args["method"] as? String,
+              let urlString = args["url"] as? String,
+              let url = URL(string: urlString),
+              let headers = args["headers"] as? [[String: Any]] else {
+            result(FlutterError(code: "INVALID_ARGS", message: "Missing required fields", details: nil))
+            return
+        }
+
+        guard let server = proxyServer else {
+            result(FlutterError(code: "PROXY_NOT_RUNNING", message: "Proxy server not running", details: nil))
+            return
+        }
+
+        let httpHeaders = headers.reduce(into: [String: String]()) { dict, header in
+            if let name = header["name"] as? String, let value = header["value"] as? String {
+                dict[name] = value
+            }
+        }
+
+        let bodyData: Data? = args["body"] as? String != nil ? Data((args["body"] as! String).utf8) : nil
+
+        Task {
+            do {
+                let exchangeId = try await server.replayRequest(
+                    method: method,
+                    url: url,
+                    headers: httpHeaders,
+                    body: bodyData
+                )
+                result(["exchangeId": exchangeId])
+            } catch {
+                result(FlutterError(
+                    code: "REPLAY_FAILED",
+                    message: error.localizedDescription,
+                    details: nil
+                ))
+            }
         }
     }
 }
