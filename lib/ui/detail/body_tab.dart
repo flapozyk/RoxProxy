@@ -225,8 +225,8 @@ class _JsonHighlightedText extends StatelessWidget {
     return SelectionArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(12),
-        child: RichText(
-          text: TextSpan(
+        child: SelectableText.rich(
+          TextSpan(
             style: const TextStyle(fontSize: 12, fontFamily: 'monospace', height: 1.5),
             children: _buildSpans(json, isDark),
           ),
