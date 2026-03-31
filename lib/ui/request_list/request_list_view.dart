@@ -245,6 +245,8 @@ class _ExchangeRow extends ConsumerWidget {
 
   bool get _canCopyCurl => !exchange.isHTTPS || exchange.isMITMDecrypted;
 
+  bool get _canCopyUrl => true; // URL can always be copied
+
   bool get _canAddDomain => exchange.isHTTPS && !exchange.isMITMDecrypted;
 
   bool get _canReplay => exchange.state == ExchangeState.completed && 
@@ -265,6 +267,18 @@ class _ExchangeRow extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('cURL copied to clipboard'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _copyUrl(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: exchange.url));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('URL copied to clipboard'),
           duration: Duration(seconds: 2),
         ),
       );
@@ -292,6 +306,11 @@ class _ExchangeRow extends ConsumerWidget {
           const PopupMenuItem<String>(
             value: 'curl',
             child: Text('Copy as cURL', style: TextStyle(fontSize: 13)),
+          ),
+        if (_canCopyUrl)
+          const PopupMenuItem<String>(
+            value: 'url',
+            child: Text('Copy URL', style: TextStyle(fontSize: 13)),
           ),
         if (_canAddDomain && !alreadyIntercepted)
           PopupMenuItem<String>(
@@ -321,6 +340,8 @@ class _ExchangeRow extends ConsumerWidget {
     if (!context.mounted) return;
     if (result == 'curl') {
       await _copyAsCurl(context, ref);
+    } else if (result == 'url') {
+      await _copyUrl(context);
     } else if (result == 'add_domain') {
       ref.read(settingsProvider.notifier).addDomain(exchange.host);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -392,7 +413,7 @@ class _ExchangeRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
       onTap: onTap,
-      onSecondaryTapDown: (_canCopyCurl || _canAddDomain)
+      onSecondaryTapDown: (_canCopyCurl || _canCopyUrl || _canAddDomain)
           ? (d) => _showContextMenu(context, ref, d.globalPosition)
           : null,
       child: Container(

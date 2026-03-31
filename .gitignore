@@ -36,3 +36,6 @@ macos/Podfile.lock
 
 # Xcode generated files
 .swiftpm/xcode/xcshareddata/xcschemes/
+
+# Release scripts
+scripts/
