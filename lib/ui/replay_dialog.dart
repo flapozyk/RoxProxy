@@ -36,7 +36,11 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
   void initState() {
     super.initState();
     _request = widget.initialRequest;
-    _urlController = TextEditingController(text: _request.url);
+    
+    // Strip query parameters from URL for display
+    final uri = Uri.parse(_request.url);
+    final baseUrl = uri.origin + uri.path;
+    _urlController = TextEditingController(text: baseUrl);
     _urlController.addListener(() {
       _updateUrl(_urlController.text);
     });
@@ -92,21 +96,50 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
   }
 
   void _updateUrl(String value) {
-    setState(() => _request.url = value);
+    // Handle manual URL modifications that might include query parameters
+    final uri = Uri.parse(value);
+    final baseUrl = uri.origin + uri.path;
+    
+    // If URL contains query parameters, parse and add them to query params list
+    if (uri.query.isNotEmpty) {
+      final newParams = uri.queryParameters;
+      
+      // Add new parameters that don't already exist
+      newParams.forEach((name, value) {
+        if (!_queryParams.any((param) => param.name == name)) {
+          setState(() {
+            _queryParams.add(QueryParam(name, value));
+            final index = _queryParams.length - 1;
+            _queryParamNameControllers[index] = TextEditingController(text: name);
+            _queryParamValueControllers[index] = TextEditingController(text: value);
+            
+            // Add listeners for new parameters
+            final paramIndex = index;
+            _queryParamNameControllers[index]!.addListener(() {
+              _updateQueryParam(paramIndex, _queryParamNameControllers[paramIndex]!.text, 
+                               _queryParams[paramIndex].value);
+            });
+            _queryParamValueControllers[index]!.addListener(() {
+              _updateQueryParam(paramIndex, _queryParams[paramIndex].name, 
+                               _queryParamValueControllers[paramIndex]!.text);
+            });
+          });
+        }
+      });
+    }
+    
+    // Update the base URL without query parameters
+    setState(() => _request.url = baseUrl);
   }
 
   void _updateMethod(String? value) {
     if (value != null) {
-      debugPrint('Method changed from ${_request.method} to $value');
       setState(() {
         _request.method = value;
         // Clear body for GET/HEAD methods
         if (value == 'GET' || value == 'HEAD') {
-          debugPrint('Clearing body for GET/HEAD method');
           _request.body = null;
           _bodyController.text = '';
-          // Re-parse query parameters when switching to GET/HEAD
-          _parseQueryParameters();
         }
       });
     }
@@ -187,24 +220,21 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
 
   String _buildUrlWithQueryParams() {
     try {
-      debugPrint('_buildUrlWithQueryParams called');
-      debugPrint('Original URL: ${_request.url}');
-      debugPrint('Query params list: ${_queryParams.map((p) => '${p.name}=${p.value}').join(', ')}');
+      // Parse the base URL (without query parameters)
+      final baseUri = Uri.parse(_request.url);
       
-      final baseUri = Uri.parse(_request.url.split('?').first);
+      // Build query parameters map from the dedicated fields
       final queryParamsMap = <String, String>{};
       for (var param in _queryParams) {
         if (param.name.isNotEmpty) {
           queryParamsMap[param.name] = param.value;
-          debugPrint('Adding param to map: ${param.name}=${param.value}');
         }
       }
+      
+      // Combine base URL with query parameters
       final newUri = baseUri.replace(queryParameters: queryParamsMap);
-      final result = newUri.toString();
-      debugPrint('Built final URL: $result');
-      return result;
+      return newUri.toString();
     } catch (e) {
-      debugPrint('Error building URL: ${e.toString()}');
       return _request.url;
     }
   }
