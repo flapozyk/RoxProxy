@@ -2,7 +2,7 @@ name: rox_proxy
 description: "RoxProxy — HTTP/HTTPS intercepting proxy for macOS."
 publish_to: 'none'
 
-version: 0.0.2+2
+version: 0.0.3+3
 
 environment:
   sdk: ^3.11.3
