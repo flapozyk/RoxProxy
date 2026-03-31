@@ -37,6 +37,9 @@ class _BodyTabState extends ConsumerState<BodyTab> {
   void didUpdateWidget(BodyTab old) {
     super.didUpdateWidget(old);
     if (old.exchange.id != widget.exchange.id) {
+      setState(() {
+        _error = null;
+      });
       _fetchIfNeeded();
     }
   }
@@ -62,11 +65,12 @@ class _BodyTabState extends ConsumerState<BodyTab> {
         ? widget.exchange.requestHeaders
         : widget.exchange.responseHeaders;
     try {
-      return headers
+      final contentTypeHeader = headers
           ?.firstWhere(
             (h) => h.name.toLowerCase() == 'content-type',
-          )
-          .value
+          );
+      return contentTypeHeader
+          ?.value
           .split(';')
           .first
           .trim();
@@ -80,11 +84,11 @@ class _BodyTabState extends ConsumerState<BodyTab> {
         ? widget.exchange.responseHeaders
         : null;
     try {
-      return headers
+      final encodingHeader = headers
           ?.firstWhere(
             (h) => h.name.toLowerCase() == 'content-encoding',
-          )
-          .value;
+          );
+      return encodingHeader?.value;
     } catch (_) {
       return null;
     }
@@ -110,9 +114,20 @@ class _BodyTabState extends ConsumerState<BodyTab> {
       // Decompress if needed
       final encoding = _contentEncoding;
       if (encoding != null &&
-          (encoding.contains('gzip') || encoding.contains('deflate'))) {
+          (encoding.contains('gzip') || encoding.contains('deflate') || encoding.contains('br'))) {
         final decompressed = await channel.decompressBody(bytes, encoding);
-        if (decompressed != null) bytes = decompressed;
+        if (decompressed != null) {
+          bytes = decompressed;
+        } else {
+          // Se la decompressione fallisce, mostra un messaggio di errore
+          if (encoding.contains('br')) {
+            setState(() {
+              _loading = false;
+              _error = 'Brotli compression is not supported. Response cannot be displayed.';
+            });
+            return;
+          }
+        }
       }
       _cacheBytes(bytes);
       if (mounted) setState(() => _loading = false);

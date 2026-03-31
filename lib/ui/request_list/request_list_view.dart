@@ -335,11 +335,32 @@ class _ExchangeRow extends ConsumerWidget {
   }
 
   Future<void> _showReplayDialog(BuildContext context, WidgetRef ref) async {
+    debugPrint('=== SHOW REPLAY DIALOG ===');
+    debugPrint('Exchange method: ${exchange.method}');
+    debugPrint('Exchange URL: ${exchange.url}');
+    debugPrint('Has cached body: ${exchange.cachedRequestBody != null}');
+    debugPrint('Has body ref: ${exchange.requestBodyRef != null}');
+    
+    // Fetch body if not cached
+    if (exchange.cachedRequestBody == null && exchange.requestBodyRef != null) {
+      debugPrint('Fetching body from storage...');
+      final channel = ref.read(proxyChannelProvider);
+      final bodyBytes = await channel.fetchBody(exchange.requestBodyRef!);
+      if (bodyBytes != null) {
+        exchange.setCachedRequestBody(bodyBytes);
+        debugPrint('Body fetched and cached: ${String.fromCharCodes(bodyBytes)}');
+      } else {
+        debugPrint('Body fetch returned null');
+      }
+    }
+    
     final replayRequest = ReplayRequest.fromExchange(exchange);
+    
     final result = await showDialog<ReplayRequest>(
       context: context,
       builder: (context) => ReplayDialog(initialRequest: replayRequest),
     );
+    
     if (result != null) {
       try {
         final channel = ref.read(proxyChannelProvider);
@@ -348,6 +369,8 @@ class _ExchangeRow extends ConsumerWidget {
           SnackBar(
             content: Text('Request replayed: $exchangeId'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(bottom: 80.0, left: 10.0, right: 10.0),
           ),
         );
       } catch (e) {
@@ -355,9 +378,13 @@ class _ExchangeRow extends ConsumerWidget {
           SnackBar(
             content: Text('Failed to replay: ${e.toString()}'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(bottom: 80.0, left: 10.0, right: 10.0),
           ),
         );
       }
+    } else {
+      debugPrint('Replay dialog cancelled');
     }
   }
 

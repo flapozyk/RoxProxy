@@ -18,14 +18,18 @@ class ReplayRequest {
   });
 
   factory ReplayRequest.fromExchange(CapturedExchange exchange) {
+    // Try to get cached body first
+    String? body;
+    if (exchange.cachedRequestBody != null) {
+      body = String.fromCharCodes(exchange.cachedRequestBody!);
+    }
+    
     return ReplayRequest(
       originalExchangeId: exchange.id,
       method: exchange.method,
       url: exchange.url,
       headers: List.from(exchange.requestHeaders),
-      body: exchange.cachedRequestBody != null
-          ? String.fromCharCodes(exchange.cachedRequestBody!)
-          : null,
+      body: body,
     );
   }
 

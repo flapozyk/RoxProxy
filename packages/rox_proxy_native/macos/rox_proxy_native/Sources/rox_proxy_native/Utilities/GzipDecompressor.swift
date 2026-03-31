@@ -83,6 +83,10 @@ enum GzipDecompressor {
         case "deflate":
             // "deflate" in HTTP is actually zlib-wrapped deflate in most implementations
             return (try? decompress(zlib: data)) ?? (try? decompress(deflate: data))
+        case "br":
+            // Brotli compression is not natively supported by the Compression framework.
+            // You would need a third-party library like `Brotli` to decompress it.
+            return nil
         case "identity", "":
             return data
         default:

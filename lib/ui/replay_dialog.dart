@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:typed_data';
 
 import '../models/replay_request.dart';
 import '../models/captured_exchange.dart';
-import '../utils/body_renderer.dart';
+
+class QueryParam {
+  final String name;
+  final String value;
+  
+  QueryParam(this.name, this.value);
+}
 
 class ReplayDialog extends ConsumerStatefulWidget {
   final ReplayRequest initialRequest;
@@ -20,8 +25,12 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
   bool _isSending = false;
   String? _error;
   late TextEditingController _urlController;
+  late TextEditingController _bodyController;
   final Map<int, TextEditingController> _nameControllers = {};
   final Map<int, TextEditingController> _valueControllers = {};
+  final Map<int, TextEditingController> _queryParamNameControllers = {};
+  final Map<int, TextEditingController> _queryParamValueControllers = {};
+  final List<QueryParam> _queryParams = [];
 
   @override
   void initState() {
@@ -31,6 +40,14 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
     _urlController.addListener(() {
       _updateUrl(_urlController.text);
     });
+    
+    _bodyController = TextEditingController(text: _request.body ?? '');
+    _bodyController.addListener(() {
+      _updateBody(_bodyController.text);
+    });
+    
+    // Parse existing query parameters from URL
+    _parseQueryParameters();
     
     // Initialize controllers for existing headers
     for (var i = 0; i < _request.headers.length; i++) {
@@ -53,11 +70,21 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
     // Remove listeners and clean up controllers
     _urlController.removeListener(() {});
     _urlController.dispose();
+    _bodyController.removeListener(() {});
+    _bodyController.dispose();
     for (var controller in _nameControllers.values) {
       controller.removeListener(() {});
       controller.dispose();
     }
     for (var controller in _valueControllers.values) {
+      controller.removeListener(() {});
+      controller.dispose();
+    }
+    for (var controller in _queryParamNameControllers.values) {
+      controller.removeListener(() {});
+      controller.dispose();
+    }
+    for (var controller in _queryParamValueControllers.values) {
       controller.removeListener(() {});
       controller.dispose();
     }
@@ -70,7 +97,115 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
 
   void _updateMethod(String? value) {
     if (value != null) {
-      setState(() => _request.method = value);
+      debugPrint('Method changed from ${_request.method} to $value');
+      setState(() {
+        _request.method = value;
+        // Clear body for GET/HEAD methods
+        if (value == 'GET' || value == 'HEAD') {
+          debugPrint('Clearing body for GET/HEAD method');
+          _request.body = null;
+          _bodyController.text = '';
+          // Re-parse query parameters when switching to GET/HEAD
+          _parseQueryParameters();
+        }
+      });
+    }
+  }
+
+  void _parseQueryParameters() {
+    try {
+      debugPrint('_parseQueryParameters called');
+      final uri = Uri.parse(_request.url);
+      uri.queryParameters.forEach((name, value) {
+        debugPrint('Found query param: $name=$value');
+        _queryParams.add(QueryParam(name, value));
+        final index = _queryParams.length - 1;
+        _queryParamNameControllers[index] = TextEditingController(text: name);
+        _queryParamValueControllers[index] = TextEditingController(text: value);
+        
+        // Add listeners for existing parameters
+        final paramIndex = index; // Capture index for closure
+        _queryParamNameControllers[index]!.addListener(() {
+          debugPrint('Existing name controller $paramIndex changed: ${_queryParamNameControllers[paramIndex]!.text}');
+          _updateQueryParam(paramIndex, _queryParamNameControllers[paramIndex]!.text, 
+                           _queryParams[paramIndex].value);
+        });
+        _queryParamValueControllers[index]!.addListener(() {
+          debugPrint('Existing value controller $paramIndex changed: ${_queryParamValueControllers[paramIndex]!.text}');
+          _updateQueryParam(paramIndex, _queryParams[paramIndex].name, 
+                           _queryParamValueControllers[paramIndex]!.text);
+        });
+      });
+    } catch (e) {
+      debugPrint('Error parsing query parameters: ${e.toString()}');
+      // Invalid URL, ignore
+    }
+  }
+
+  void _updateQueryParam(int index, String name, String value) {
+    debugPrint('Updating query param $index: $name=$value');
+    if (index < _queryParams.length) {
+      _queryParams[index] = QueryParam(name, value);
+      // Force rebuild to update the "Current URL" display
+      setState(() {});
+    }
+  }
+
+  void _addQueryParam() {
+    setState(() {
+      _queryParams.add(QueryParam('', ''));
+      final index = _queryParams.length - 1;
+      _queryParamNameControllers[index] = TextEditingController();
+      _queryParamValueControllers[index] = TextEditingController();
+      
+      // Add listeners
+      _queryParamNameControllers[index]!.addListener(() {
+        debugPrint('Name controller $index changed: ${_queryParamNameControllers[index]!.text}');
+        _updateQueryParam(index, _queryParamNameControllers[index]!.text, 
+                         _queryParams[index].value);
+      });
+      _queryParamValueControllers[index]!.addListener(() {
+        debugPrint('Value controller $index changed: ${_queryParamValueControllers[index]!.text}');
+        _updateQueryParam(index, _queryParams[index].name, 
+                         _queryParamValueControllers[index]!.text);
+      });
+    });
+  }
+
+  void _removeQueryParam(int index) {
+    setState(() {
+      _queryParams.removeAt(index);
+      _queryParamNameControllers.remove(index)?.dispose();
+      _queryParamValueControllers.remove(index)?.dispose();
+      // Reindex controllers
+      for (var i = index; i < _queryParams.length; i++) {
+        _queryParamNameControllers[i] = _queryParamNameControllers.remove(i + 1)!;
+        _queryParamValueControllers[i] = _queryParamValueControllers.remove(i + 1)!;
+      }
+    });
+  }
+
+  String _buildUrlWithQueryParams() {
+    try {
+      debugPrint('_buildUrlWithQueryParams called');
+      debugPrint('Original URL: ${_request.url}');
+      debugPrint('Query params list: ${_queryParams.map((p) => '${p.name}=${p.value}').join(', ')}');
+      
+      final baseUri = Uri.parse(_request.url.split('?').first);
+      final queryParamsMap = <String, String>{};
+      for (var param in _queryParams) {
+        if (param.name.isNotEmpty) {
+          queryParamsMap[param.name] = param.value;
+          debugPrint('Adding param to map: ${param.name}=${param.value}');
+        }
+      }
+      final newUri = baseUri.replace(queryParameters: queryParamsMap);
+      final result = newUri.toString();
+      debugPrint('Built final URL: $result');
+      return result;
+    } catch (e) {
+      debugPrint('Error building URL: ${e.toString()}');
+      return _request.url;
     }
   }
 
@@ -112,6 +247,11 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
   }
 
   Future<void> _sendRequest() async {
+    // Debug: Log initial state
+    debugPrint('=== SEND REQUEST DEBUG ===');
+    debugPrint('Method: ${_request.method}');
+    debugPrint('Original URL: ${_request.url}');
+    
     // Update headers from controllers before validation
     for (var i = 0; i < _request.headers.length; i++) {
       final name = _nameControllers[i]?.text.trim() ?? '';
@@ -129,6 +269,37 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
       }
     }
 
+    // Build final URL with query parameters for GET/HEAD methods
+    if (_request.method == 'GET' || _request.method == 'HEAD') {
+      debugPrint('Preparing GET/HEAD request');
+      // Remove Content-Length header for GET/HEAD requests as they should not have it
+      _request.headers.removeWhere((header) => 
+        header.name.toLowerCase() == 'content-length'
+      );
+      
+      final builtUrl = _buildUrlWithQueryParams();
+      debugPrint('Query params: ${_queryParams.map((p) => '${p.name}=${p.value}').join(', ')}');
+      debugPrint('Built URL: $builtUrl');
+      _request.url = builtUrl;
+    } else {
+      debugPrint('Body: ${_request.body ?? 'null'}');
+    }
+
+    // Debug: Log all query param controllers
+    debugPrint('Query param controllers state:');
+    _queryParamNameControllers.forEach((index, controller) {
+      debugPrint('  Param $index name: ${controller.text}');
+    });
+    _queryParamValueControllers.forEach((index, controller) {
+      debugPrint('  Param $index value: ${controller.text}');
+    });
+
+    // Debug: Log final headers
+    debugPrint('Final headers after cleanup:');
+    for (var header in _request.headers) {
+      debugPrint('  ${header.name}: ${header.value}');
+    }
+
     setState(() {
       _isSending = true;
       _error = null;
@@ -137,10 +308,12 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
     try {
       // TODO: Implement actual sending logic via ProxyService
       await Future.delayed(const Duration(seconds: 1));
+      debugPrint('Request sent successfully');
       if (mounted) {
         Navigator.of(context).pop(_request);
       }
     } catch (e) {
+      debugPrint('Request failed: ${e.toString()}');
       if (mounted) {
         setState(() {
           _isSending = false;
@@ -152,20 +325,6 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final contentType = _request.headers
-        .firstWhere(
-          (h) => h.name.toLowerCase() == 'content-type',
-          orElse: () => HttpHeader('content-type', 'application/json'),
-        )
-        .value;
-
-    final bodyMode = _request.body != null
-        ? BodyRenderer.render(
-            data: Uint8List.fromList(_request.body!.codeUnits),
-            contentType: contentType,
-          )
-        : RenderEmpty();
-
     return AlertDialog(
       title: const Text('Replay Request'),
       content: SizedBox(
@@ -175,30 +334,43 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red, fontSize: 14),
+                  ),
+                ),
+              if (_isSending)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: SizedBox(
+                    height: 20,
+                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  ),
+                ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  SizedBox(
-                    width: 100,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 100, maxWidth: 120),
                     child: DropdownButtonFormField<String>(
-                      value: _request.method,
-                      items:
-                          const [
-                                'GET',
-                                'POST',
-                                'PUT',
-                                'PATCH',
-                                'DELETE',
-                                'HEAD',
-                                'OPTIONS',
-                              ]
-                              .map(
-                                (method) => DropdownMenuItem(
-                                  value: method,
-                                  child: Text(method),
-                                ),
-                              )
-                              .toList(),
+                      initialValue: _request.method,
+                      items: const [
+                        'GET',
+                        'POST',
+                        'PUT',
+                        'PATCH',
+                        'DELETE',
+                        'HEAD',
+                        'OPTIONS',
+                      ].map(
+                        (method) => DropdownMenuItem(
+                          value: method,
+                          child: Text(method),
+                        ),
+                      ).toList(),
                       onChanged: _updateMethod,
                       decoration: const InputDecoration(
                         labelText: 'Method',
@@ -275,32 +447,87 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
                 onPressed: _addHeader,
               ),
               const SizedBox(height: 16),
-              const Text('Body', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              if (bodyMode is RenderJson)
-                _JsonHighlightedText((bodyMode as RenderJson).text)
-              else if (bodyMode is RenderText)
-                _MonospaceText((bodyMode as RenderText).text)
-              else if (bodyMode is RenderHex)
-                _MonospaceText((bodyMode as RenderHex).text, isHex: true)
-              else
-                TextField(
-                  controller: TextEditingController(text: _request.body ?? ''),
-                  onChanged: _updateBody,
-                  maxLines: 10,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Body',
+              
+              // Query Parameters section for GET/HEAD methods
+              if (_request.method == 'GET' || _request.method == 'HEAD') ...[
+                const Text('Query Parameters', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                ..._queryParams.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  return Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: _queryParamNameControllers[index],
+                          onChanged: (name) => _updateQueryParam(index, name, _queryParams[index].value),
+                          decoration: const InputDecoration(
+                            labelText: 'Name',
+                            isDense: true,
+                          ),
+                          textAlign: TextAlign.left,
+                          textDirection: TextDirection.ltr,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 3,
+                        child: TextField(
+                          controller: _queryParamValueControllers[index],
+                          onChanged: (value) => _updateQueryParam(index, _queryParams[index].name, value),
+                          decoration: const InputDecoration(
+                            labelText: 'Value',
+                            isDense: true,
+                          ),
+                          textAlign: TextAlign.left,
+                          textDirection: TextDirection.ltr,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, size: 18),
+                        onPressed: () => _removeQueryParam(index),
+                      ),
+                    ],
+                  );
+                }),
+                TextButton.icon(
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add Parameter'),
+                  onPressed: _addQueryParam,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Current URL: ${_buildUrlWithQueryParams()}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+              
+              // Body section for other methods
+              if (_request.method != 'GET' && _request.method != 'HEAD') ...[
+                const SizedBox(height: 16),
+                const Text('Body', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade400),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: SingleChildScrollView(
+                    child: TextField(
+                      controller: _bodyController,
+                      maxLines: null,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.all(12),
+                        labelText: 'Body',
+                      ),
+                      textAlign: TextAlign.left,
+                      textDirection: TextDirection.ltr,
+                    ),
                   ),
                 ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                ),
+              ],
             ],
           ),
         ),
@@ -322,131 +549,5 @@ class _ReplayDialogState extends ConsumerState<ReplayDialog> {
         ),
       ],
     );
-  }
-}
-
-class _MonospaceText extends StatelessWidget {
-  final String text;
-  final bool isHex;
-
-  const _MonospaceText(this.text, {this.isHex = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade400),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: SelectionArea(
-        child: SingleChildScrollView(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: isHex ? 11 : 12,
-              fontFamily: 'monospace',
-              height: 1.5,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _JsonHighlightedText extends StatelessWidget {
-  final String json;
-  const _JsonHighlightedText(this.json);
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade400),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: SelectionArea(
-        child: SingleChildScrollView(
-          child: RichText(
-            text: TextSpan(
-              style: const TextStyle(
-                fontSize: 12,
-                fontFamily: 'monospace',
-                height: 1.5,
-              ),
-              children: _buildSpans(json, isDark),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  static List<TextSpan> _buildSpans(String source, bool isDark) {
-    final keyColor = isDark ? const Color(0xFF9CDCFE) : const Color(0xFF0451A5);
-    final stringColor = isDark
-        ? const Color(0xFFCE9178)
-        : const Color(0xFFA31515);
-    final numberColor = isDark
-        ? const Color(0xFFB5CEA8)
-        : const Color(0xFF098658);
-    final boolNullColor = isDark
-        ? const Color(0xFF569CD6)
-        : const Color(0xFF0000FF);
-    final defaultColor = isDark
-        ? const Color(0xFFD4D4D4)
-        : const Color(0xFF1E1E1E);
-
-    final re = RegExp(
-      r'("(?:[^"]|\\")*")' // group 1 – string
-      r'|(-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)' // group 2 – number
-      r'|(true|false|null)' // group 3 – keyword
-      r'|([{}\[\],:])' // group 4 – punctuation
-      r'|(\s+)' // group 5 – whitespace
-      r'|(.)', // group 6 – fallback
-      dotAll: true,
-    );
-
-    final spans = <TextSpan>[];
-    for (final m in re.allMatches(source)) {
-      if (m.group(1) != null) {
-        var i = m.end;
-        while (i < source.length && (source[i] == ' ' || source[i] == '\t')) {
-          i++;
-        }
-        final isKey = i < source.length && source[i] == ':';
-        spans.add(
-          TextSpan(
-            text: m.group(1),
-            style: TextStyle(color: isKey ? keyColor : stringColor),
-          ),
-        );
-      } else if (m.group(2) != null) {
-        spans.add(
-          TextSpan(
-            text: m.group(2),
-            style: TextStyle(color: numberColor),
-          ),
-        );
-      } else if (m.group(3) != null) {
-        spans.add(
-          TextSpan(
-            text: m.group(3),
-            style: TextStyle(color: boolNullColor),
-          ),
-        );
-      } else {
-        spans.add(
-          TextSpan(
-            text: m.group(0),
-            style: TextStyle(color: defaultColor),
-          ),
-        );
-      }
-    }
-    return spans;
   }
 }

@@ -7,10 +7,14 @@ A macOS 14+ desktop HTTP/HTTPS proxy inspector. Built with Flutter (UI) and Swif
 - Intercept and inspect HTTP and HTTPS traffic
 - MITM TLS decryption for configured domains
 - Live request/response stream with filtering
-- Body viewer with gzip decompression
+- Body viewer with gzip/deflate decompression
 - CA certificate installer for macOS System Keychain
 - Certificate download endpoint for mobile/LAN devices (`http://cert.roxproxy/`)
 - Crash recovery: system proxy is restored on unclean exit
+
+## Known Limitations
+
+- **Brotli compression**: Responses compressed with Brotli (`br`) are not supported and will display an error message. Use gzip or deflate compression instead.
 
 ## Requirements
 
