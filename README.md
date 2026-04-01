@@ -86,3 +86,38 @@ On first launch, `CertificateAuthority` generates a self-signed P-256 root CA st
 ## macOS entitlements
 
 App Sandbox is disabled — required for TCP binding on all interfaces, `networksetup` subprocess calls, and Keychain trust operations.
+
+## Security warning on first launch
+
+When you first launch Rox Proxy, macOS may show a security warning:
+
+> "Rox Proxy" cannot be opened because Apple cannot check it for malicious software.
+
+This happens because the app is not signed with an Apple Developer ID and the sandbox is disabled (necessary for proxy functionality).
+
+### How to open Rox Proxy:
+
+**Method 1: Open from Finder**
+1. Go to your Applications folder
+2. Find "Rox Proxy" in the list
+3. Control-click (or right-click) on the app icon
+4. Select "Open" from the context menu
+5. Click "Open" in the security dialog that appears
+
+**Method 2: Using Terminal**
+```bash
+# Remove quarantine flag
+sudo xattr -r -d com.apple.quarantine /Applications/Rox\ Proxy.app
+
+# Add to security exceptions
+sudo spctl --add /Applications/Rox\ Proxy.app
+```
+
+**Method 3: System Preferences**
+1. Try opening the app normally (double-click)
+2. When blocked, open System Settings → Privacy & Security
+3. Under the "Security" section, you'll see:
+   > "Rox Proxy" was blocked because it is not from an identified developer
+4. Click "Open Anyway"
+
+After the first launch, macOS will remember your choice and won't show this warning again.
